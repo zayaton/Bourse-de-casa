@@ -1,0 +1,7 @@
+curl_cffi
+pandas
+numpy
+lightgbm
+scikit-learn
+supabase
+requests

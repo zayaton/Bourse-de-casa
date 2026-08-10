@@ -1,0 +1,40 @@
+name: Daily stock pick
+
+on:
+  schedule:
+    # 16:00 UTC ≈ 17:00 in Casablanca (Morocco doesn't observe changing
+    # DST the way Europe does — double check this offset around any
+    # policy changes, or just watch the first few runs' timestamps).
+    - cron: '0 16 * * 1-5'   # weekdays only
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: 'Optional: run a backtest for a specific date (YYYY-MM-DD) instead of the live daily pick'
+        required: false
+        default: ''
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scheduled daily pick
+        if: github.event.inputs.target_date == ''
+        working-directory: scripts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python run_daily.py --mode live
+
+      - name: Run manual backtest
+        if: github.event.inputs.target_date != ''
+        working-directory: scripts
+        run: python run_daily.py --mode backtest --target-date "${{ github.event.inputs.target_date }}"

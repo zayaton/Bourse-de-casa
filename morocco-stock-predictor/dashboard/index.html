@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BDC Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #0A0D12;
+    --bg-elev: #12161D;
+    --bg-elev-2: #171C25;
+    --rule: rgba(232, 163, 61, 0.14);
+    --rule-soft: rgba(255, 255, 255, 0.06);
+    --text: #E8ECF1;
+    --text-dim: #6B7684;
+    --amber: #E8A33D;
+    --hit: #3ED598;
+    --miss: #FF5C5C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    margin: 0;
+    padding: 32px 20px 60px;
+    position: relative;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,163,61,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,163,61,0.035) 1px, transparent 1px);
+    background-size: 34px 34px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .sheet { max-width: 760px; margin: 0 auto; position: relative; z-index: 1; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .fade-in.d1 { animation-delay: 0.05s; }
+  .fade-in.d2 { animation-delay: 0.15s; }
+  .fade-in.d3 { animation-delay: 0.25s; }
+
+  header {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 16px;
+    margin-bottom: 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  h1 { font-size: 19px; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+  .eyebrow { font-size: 12px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+
+  .live-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--amber);
+    animation: pulse 2s infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  .pick-card {
+    background: linear-gradient(180deg, var(--bg-elev-2), var(--bg-elev));
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 28px;
+    margin-bottom: 32px;
+  }
+  .pick-card .label {
+    font-size: 11px; color: var(--text-dim); text-transform: uppercase;
+    letter-spacing: 0.12em; display: flex; align-items: center;
+  }
+  .pick-card .ticker {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 46px; font-weight: 700; margin: 8px 0 4px;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .pick-sentence {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin: 0 0 16px;
+  }
+  .pick-sentence strong { color: var(--amber); font-weight: 600; }
+  .weekend-msg {
+    font-size: 15px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    padding: 6px 0 2px;
+  }
+  .pick-meta { display: flex; gap: 28px; font-size: 13px; color: var(--text-dim); flex-wrap: wrap; }
+  .pick-meta strong { color: var(--amber); font-weight: 600; }
+
+  section h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 14px;
+  }
+  section h2 .subnote {
+    text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12px;
+  }
+  .stats-row { display: flex; gap: 32px; margin-bottom: 22px; }
+  .stats-row div strong {
+    display: block; font-family: 'Space Grotesk', sans-serif;
+    font-size: 26px; font-weight: 700; color: var(--text);
+  }
+  .stats-row div strong.stat-positive { color: var(--hit); }
+  .stats-row div strong.stat-negative { color: var(--miss); }
+  .stats-row div { font-size: 12px; color: var(--text-dim); }
+
+  .chart-wrap {
+    background: var(--bg-elev);
+    border: 1px solid var(--rule-soft);
+    border-radius: 6px;
+    padding: 20px 16px 8px;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--rule-soft); }
+  th { color: var(--text-dim); font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+  tbody tr:hover { background: rgba(232, 163, 61, 0.05); }
+  .hit { color: var(--hit); font-weight: 600; }
+  .miss { color: var(--miss); font-weight: 600; }
+  .empty-state { font-size: 13px; color: var(--text-dim); padding: 24px 0; text-align: center; }
+
+  @media (max-width: 480px) {
+    .pick-card .ticker { font-size: 36px; }
+    .pick-meta { gap: 16px; }
+    .stats-row { gap: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="fade-in">
+    <h1>BDC Project</h1>
+    <div class="eyebrow"><span class="live-dot"></span><span id="asof">—</span></div>
+  </header>
+
+  <div class="pick-card fade-in d1" id="pick-card">
+    <div class="label">Tomorrow's pick</div>
+    <div class="ticker" id="pick-ticker">—</div>
+    <div class="pick-sentence" id="pick-sentence"></div>
+    <div class="pick-meta">
+      <span>Confidence: <strong id="pick-confidence">—</strong></span>
+      <span>Reference price: <strong id="pick-price">—</strong> MAD</span>
+    </div>
+  </div>
+
+  <section class="fade-in d2">
+    <h2>This Month</h2>
+    <div class="stats-row">
+      <div><strong id="month-return">—</strong>return</div>
+      <div><strong id="month-picks">—</strong>picks resolved</div>
+      <div><strong id="month-hitrate">—</strong>hit rate</div>
+    </div>
+  </section>
+
+  <section class="fade-in d2" style="margin-top: 32px;">
+    <h2>Track record</h2>
+    <div class="stats-row">
+      <div><strong id="stat-total">—</strong>picks resolved</div>
+      <div><strong id="stat-hitrate">—</strong>hit rate</div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart" height="90"></canvas>
+    </div>
+  </section>
+
+  <section class="fade-in d3" style="margin-top: 32px;">
+    <h2>History <span class="subnote">(since Jul 1, 2026)</span></h2>
+    <table id="history-table">
+      <thead><tr><th>Target date</th><th>Ticker</th><th>Confidence</th><th>Result</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="empty-state" id="empty-state" style="display:none;">No resolved picks yet.</div>
+  </section>
+</div>
+
+<script>
+  // Public, read-only credentials — safe to expose in client-side code.
+  const SUPABASE_URL = "https://abwnoqdmtdtihkmnhckn.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_NMl43lJucXCgpusHTJqAww_tXsUkQ-M";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Everything in "This Month" / "Track record" / "History" only counts picks
+  // targeting this date or later. Change this if you ever want to move the
+  // start line.
+  const HISTORY_START_DATE = '2026-07-01';
+
+  // The model's pop target — keep this in sync with POP_THRESHOLD in scripts/model.py
+  const POP_TARGET_PCT = 1.5;
+
+  function countUp(el, target, suffix = '', duration = 900) {
+    const start = performance.now();
+    function frame(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = (target * eased).toFixed(target < 10 ? 1 : 0) + suffix;
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function isWeekend() {
+    const day = new Date().getDay(); // 0 = Sunday, 6 = Saturday
+    return day === 0 || day === 6;
+  }
+
+  // Turns "2026-08-12" into "Wed, Aug 12" so a date never gets misread.
+  function formatDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  async function load() {
+    const { data, error } = await supabase
+      .from('daily_picks')
+      .select('*')
+      .order('target_date', { ascending: false });
+
+    if (error) {
+      document.getElementById('asof').textContent = 'Error loading data — check console';
+      console.error(error);
+      return;
+    }
+    if (!data || data.length === 0) return;
+
+    // --- Today's pick, or a weekend note if the market is closed ---
+    if (isWeekend()) {
+      document.getElementById('asof').textContent = 'Weekend — market closed';
+      document.getElementById('pick-card').innerHTML = `
+        <div class="label">Tomorrow's pick</div>
+        <div class="weekend-msg">Weekend — the Casablanca Bourse is closed. Next pick posts Monday.</div>
+      `;
+    } else {
+      const latest = data[0];
+      document.getElementById('asof').textContent = `As of ${latest.prediction_date}`;
+      document.getElementById('pick-ticker').textContent = latest.ticker;
+      document.getElementById('pick-sentence').innerHTML =
+        `<strong>${latest.ticker}</strong> is projected to rise <strong>${POP_TARGET_PCT}%+</strong> by <strong>${formatDate(latest.target_date)}</strong>.`;
+      countUp(document.getElementById('pick-confidence'), Math.round(latest.confidence * 100), '%');
+      document.getElementById('pick-price').textContent = latest.reference_close?.toFixed(2) ?? '—';
+    }
+
+    // --- Everything below only looks at picks from HISTORY_START_DATE onward ---
+    const sinceStart = data.filter(d => d.target_date >= HISTORY_START_DATE);
+    const resolved = sinceStart.filter(d => d.status === 'resolved').reverse(); // chronological for the chart
+    const total = resolved.length;
+    const hits = resolved.filter(d => d.hit).length;
+    countUp(document.getElementById('stat-total'), total);
+    countUp(document.getElementById('stat-hitrate'), total ? Math.round((hits / total) * 100) : 0, '%');
+
+    // --- This month's return: sum of each resolved pick's % move this calendar month ---
+    const now = new Date();
+    const monthPicks = resolved.filter(d => {
+      const dt = new Date(d.target_date + 'T00:00:00');
+      return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
+    });
+    const monthReturn = monthPicks.reduce((sum, d) => sum + (d.pct_change || 0), 0) * 100;
+    const monthHits = monthPicks.filter(d => d.hit).length;
+
+    const monthReturnEl = document.getElementById('month-return');
+    monthReturnEl.textContent = (monthReturn >= 0 ? '+' : '') + monthReturn.toFixed(1) + '%';
+    monthReturnEl.className = monthReturn >= 0 ? 'stat-positive' : 'stat-negative';
+    document.getElementById('month-picks').textContent = monthPicks.length;
+    document.getElementById('month-hitrate').textContent =
+      monthPicks.length ? Math.round((monthHits / monthPicks.length) * 100) + '%' : '—';
+
+    const tbody = document.querySelector('#history-table tbody');
+    if (resolved.length === 0) {
+      document.getElementById('empty-state').style.display = 'block';
+    } else {
+      [...resolved].reverse().forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${formatDate(row.target_date)}</td>
+          <td>${row.ticker}</td>
+          <td>${Math.round(row.confidence * 100)}%</td>
+          <td class="${row.hit ? 'hit' : 'miss'}">${row.pct_change >= 0 ? '+' : ''}${(row.pct_change * 100).toFixed(1)}% ${row.hit ? '(hit)' : '(miss)'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    new Chart(document.getElementById('chart'), {
+      type: 'bar',
+      data: {
+        labels: resolved.map(r => formatDate(r.target_date)),
+        datasets: [{
+          label: `Actual move vs +${POP_TARGET_PCT}% target`,
+          data: resolved.map(r => (r.pct_change * 100).toFixed(2)),
+          backgroundColor: resolved.map(r => r.hit ? '#3ED598' : '#FF5C5C'),
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        animation: { duration: 900, easing: 'easeOutCubic' },
+        scales: {
+          y: {
+            title: { display: true, text: '% change', color: '#6B7684' },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#6B7684' },
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#6B7684' },
+          },
+        },
+        plugins: { legend: { display: false } },
+      },
+    });
+  }
+
+  load();
+</script>
+</body>
+</html>
