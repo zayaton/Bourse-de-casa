@@ -20,6 +20,15 @@ def build_features(prices: pd.DataFrame, masi: pd.DataFrame | None) -> pd.DataFr
     """
     df = prices.sort_values(['Ticker', 'Date']).copy()
 
+    # Belt-and-suspenders: force these to real numbers again right here, no
+    # matter what dtype they arrived as. Something upstream (the scraper's
+    # merge step that fills in missing weekdays) can still let these come
+    # through as text in some cases, and this is the last point before any
+    # math happens on them.
+    for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
     df['vol_ma_5'] = df.groupby('Ticker')['Volume'].transform(lambda x: x.rolling(5).mean())
     df['vol_spike'] = df['Volume'] / (df['vol_ma_5'] + 1)
 
