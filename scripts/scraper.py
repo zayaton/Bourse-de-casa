@@ -44,6 +44,15 @@ def _fetch(instrument_id: str, end_date: str, start_date: str = START_DATE) -> p
         if not data:
             return None
         df = pd.DataFrame(data)[list(COLS.keys())].rename(columns=COLS)
+
+        # investing.com sometimes sends these as JSON strings (e.g. "1234.50")
+        # instead of numbers. Force them to real numbers here, once, so nothing
+        # downstream (features.py doing division, etc.) can silently choke on text.
+        numeric_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
         return df
     except Exception as e:
         print(f"Failed to fetch {instrument_id}: {e}")
