@@ -53,6 +53,12 @@ def _fetch(instrument_id: str, end_date: str, start_date: str = START_DATE) -> p
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
+        # investing.com sends dates as day-first text (e.g. "05.08.2026").
+        # Convert once, here, so every caller (stocks AND the MASI index)
+        # gets a real date back instead of text -- this used to only happen
+        # for stock prices, which is why merging with the index broke.
+        df['Date'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
+
         return df
     except Exception as e:
         print(f"Failed to fetch {instrument_id}: {e}")
