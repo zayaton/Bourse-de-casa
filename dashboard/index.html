@@ -162,7 +162,7 @@
   </header>
 
   <div class="pick-card fade-in d1" id="pick-card">
-    <div class="label">Tomorrow's pick</div>
+    <div class="label" id="pick-label">Latest pick</div>
     <div class="ticker" id="pick-ticker">—</div>
     <div class="pick-sentence" id="pick-sentence"></div>
     <div class="pick-meta">
@@ -212,8 +212,9 @@
   // start line.
   const HISTORY_START_DATE = '2026-07-01';
 
-  // The model's pop target — keep this in sync with POP_THRESHOLD in scripts/model.py
-  const POP_TARGET_PCT = 1.5;
+  // The model's pop target — keep these in sync with model.py's CONFIG block
+  const POP_TARGET_PCT = 2.5;
+  const TARGET_WINDOW_DAYS = 3;
 
   function countUp(el, target, suffix = '', duration = 900) {
     const start = performance.now();
@@ -254,15 +255,28 @@
     if (isWeekend()) {
       document.getElementById('asof').textContent = 'Weekend — market closed';
       document.getElementById('pick-card').innerHTML = `
-        <div class="label">Tomorrow's pick</div>
+        <div class="label">Latest pick</div>
         <div class="weekend-msg">Weekend — the Casablanca Bourse is closed. Next pick posts Monday.</div>
       `;
     } else {
       const latest = data[0];
-      document.getElementById('asof').textContent = `As of ${latest.prediction_date}`;
+
+      // A pick is only "today's" pick if it was made as of today (or the
+      // last trading day). Anything older means the pipeline didn't
+      // produce a fresh pick since then — worth a visible flag instead of
+      // silently showing a stale ticker like it's current.
+      const latestPredictionDate = new Date(latest.prediction_date + 'T00:00:00');
+      const daysSincePick = Math.round((new Date().setHours(0,0,0,0) - latestPredictionDate) / 86400000);
+      const isStale = daysSincePick > 3; // more than a long weekend old
+
+      document.getElementById('asof').textContent =
+        (isStale ? '⚠ Stale — ' : '') + `As of ${latest.prediction_date}`;
+      document.getElementById('pick-label').textContent = isStale ? 'Last known pick (stale)' : 'Latest pick';
       document.getElementById('pick-ticker').textContent = latest.ticker;
       document.getElementById('pick-sentence').innerHTML =
-        `<strong>${latest.ticker}</strong> is projected to rise <strong>${POP_TARGET_PCT}%+</strong> by <strong>${formatDate(latest.target_date)}</strong>.`;
+        `<strong>${latest.ticker}</strong> is projected to close <strong>${POP_TARGET_PCT}%+</strong> above ` +
+        `<strong>${latest.reference_close?.toFixed(2) ?? '—'} MAD</strong> at some point in the next ` +
+        `${TARGET_WINDOW_DAYS} trading days (by <strong>${formatDate(latest.target_date)}</strong>).`;
       countUp(document.getElementById('pick-confidence'), Math.round(latest.confidence * 100), '%');
       document.getElementById('pick-price').textContent = latest.reference_close?.toFixed(2) ?? '—';
     }

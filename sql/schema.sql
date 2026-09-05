@@ -3,8 +3,10 @@
 create table if not exists daily_picks (
   id bigserial primary key,
 
-  -- prediction_date = the day the data was as-of (day before target_date)
-  -- target_date     = the day being predicted for (the pick is meant to pop on this day)
+  -- prediction_date = the day the model stood on (reference close = "buy" price)
+  -- target_date     = the last day of the 3-trading-day window the pick is
+  --                    given to pop within (i.e. window_end_date) — the
+  --                    outcome isn't knowable until this date has passed
   prediction_date date not null,
   target_date date not null,
 
@@ -12,10 +14,10 @@ create table if not exists daily_picks (
   confidence numeric not null,        -- model's predicted probability, 0-1
   reference_close numeric,            -- stock's close price on prediction_date (what you'd buy at)
 
-  -- filled in the day after target_date, once the outcome is known
-  actual_close numeric,
+  -- filled in once target_date has passed and the outcome is known
+  actual_close numeric,               -- best close reached anywhere in the window
   pct_change numeric,
-  hit boolean,                        -- true if pct_change >= 0.015
+  hit boolean,                        -- true if pct_change > TARGET_PCT (see scripts/model.py)
 
   status text not null default 'pending',  -- 'pending' -> 'resolved'
   created_at timestamptz not null default now(),

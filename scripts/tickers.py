@@ -21,8 +21,8 @@ STOCK_IDS = {
     "WAA": "13299", "ZDJ": "13300",
 }
 
-# investing.com's internal ID for the MASI index itself. Find it the same
-# way you found the stock IDs: open the MASI page on investing.com, open
-# your browser's Network tab, filter for "historical", and look at the
-# request URL — it ends in /historical/<id>. Paste that number below.
+# investing.com's internal ID for the MASI index. Not currently used by
+# anything (features.py was reverted to match geminiML1.py's feature set
+# exactly, which doesn't include a MASI-relative feature) — kept here in
+# case you want to reintroduce a market-relative feature later.
 MASI_INDEX_ID = "13228"
