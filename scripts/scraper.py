@@ -39,6 +39,10 @@ COLS = {
     'last_minRaw': 'Low', 'last_closeRaw': 'Close', 'volumeRaw': 'Volume',
 }
 
+# Columns that must be real numbers before any arithmetic (bad-tick check,
+# ret_1d/ret_3d features, model input, etc.) touches them.
+NUMERIC_COLS = ['Open', 'High', 'Low', 'Close', 'Volume']
+
 
 def _fetch(instrument_id: str, end_date: str, start_date: str = START_DATE, tries: int = 3) -> pd.DataFrame | None:
     url = f"{BASE_URL}{instrument_id}"
@@ -58,6 +62,14 @@ def _fetch(instrument_id: str, end_date: str, start_date: str = START_DATE, trie
             if not data:
                 return None
             df = pd.DataFrame(data)[list(COLS.keys())].rename(columns=COLS)
+            # investing.com's "Raw" fields aren't guaranteed to arrive as
+            # real JSON numbers — sometimes they come back as strings.
+            # Force numeric here, once, at the source, so every downstream
+            # consumer (bad-tick guard, features, model) can trust these
+            # are floats. Anything that can't be parsed becomes NaN rather
+            # than silently poisoning arithmetic later.
+            for col in NUMERIC_COLS:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
             return df
         except Exception as e:
             last_err = e
@@ -95,10 +107,11 @@ def _clean_bad_ticks(df: pd.DataFrame, deviation: float = BAD_TICK_DEVIATION) ->
             is_bad = (
                 last_good_close is not None
                 and row['Volume'] == 0
+                and pd.notna(row['Close'])
                 and abs(row['Close'] - last_good_close) / last_good_close > deviation
             )
             flags.append(is_bad)
-            if not is_bad:
+            if not is_bad and pd.notna(row['Close']):
                 last_good_close = row['Close']
         group.loc[flags, ['Open', 'High', 'Low', 'Close']] = None
         n_bad = sum(flags)
