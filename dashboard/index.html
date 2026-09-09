@@ -205,7 +205,7 @@
   // Public, read-only credentials — safe to expose in client-side code.
   const SUPABASE_URL = "https://abwnoqdmtdtihkmnhckn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_NMl43lJucXCgpusHTJqAww_tXsUkQ-M";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // Everything in "This Month" / "Track record" / "History" only counts picks
   // targeting this date or later. Change this if you ever want to move the
@@ -239,7 +239,7 @@
   }
 
   async function load() {
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from('daily_picks')
       .select('*')
       .order('target_date', { ascending: false });
